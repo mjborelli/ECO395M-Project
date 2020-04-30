@@ -1,0 +1,46 @@
+---
+title: "Data Mining Project"
+author: "Matthew Borelli"
+date: "4/27/2020"
+output: pdf_document
+---
+
+#
+
+## Abstract
+
+## Introduction
+
+## Methods
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(data.table)
+library(tm)
+library(gamlr)
+library(stringr)
+
+setwd("D:/Documents/MA Econ/Spring/Data Mining and Statistical Learning/ECO395M-Project")
+pol_ads = fread("./fbpac-ads-en-US.csv", select=c(3, 4, 5, 6, 12, 13, 22, 24))
+```
+
+```{r text_cleaning}
+# Text cleeaning, removing html tags and replacing Unicode characters
+pol_ads$message = str_remove(pol_ads$message, "</p><p>")
+pol_ads$message = str_remove(pol_ads$message, "<p>")
+pol_ads$message = str_remove(pol_ads$message, "</p>")
+
+
+pol_ads$message = str_replace(pol_ads$message, "â€™", "'")
+pol_ads$message = str_replace(pol_ads$message, "â€", '-')
+```
+```{r document_matrix}
+descr = Corpus(VectorSource(pol_ads$message))
+xtext = DocumentTermMatrix(descr)
+
+xtext = sparseMatrix(i=xtext$i,j=xtext$j,x=as.numeric(xtext$v>0), dims=dim(xtext),dimnames=dimnames(xtext))
+
+findFreqTerms(xtext, 2000)
+```
+
