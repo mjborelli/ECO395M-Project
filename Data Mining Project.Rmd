@@ -14,33 +14,83 @@ output: pdf_document
 ## Methods
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 
 library(data.table)
 library(tm)
 library(gamlr)
 library(stringr)
+library(SnowballC)
+library(wordcloud)
+library(RColorBrewer)
+library(dplyr)
 
 setwd("D:/Documents/MA Econ/Spring/Data Mining and Statistical Learning/ECO395M-Project")
-pol_ads = fread("./fbpac-ads-en-US.csv", select=c(3, 4, 5, 6, 12, 13, 22, 24))
+pol_ads = fread("../fbpac-ads-en-US.csv", select=c(3, 4, 5, 6, 12, 13, 22, 24))
 ```
 
 ```{r text_cleaning}
-# Text cleeaning, removing html tags and replacing Unicode characters
-pol_ads$message = str_remove(pol_ads$message, "</p><p>")
-pol_ads$message = str_remove(pol_ads$message, "<p>")
-pol_ads$message = str_remove(pol_ads$message, "</p>")
-
-
-pol_ads$message = str_replace(pol_ads$message, "â€™", "'")
-pol_ads$message = str_replace(pol_ads$message, "â€", '-')
+# Removing html tags
+pol_ads$message = str_remove_all(pol_ads$message, "</p><p>")
+pol_ads$message = str_remove_all(pol_ads$message, "<p>")
+pol_ads$message = str_remove_all(pol_ads$message, "</p>")
+# Removing Unicode punctuation
+pol_ads$message = str_remove_all(pol_ads$message, "â€™")
+pol_ads$message = str_remove_all(pol_ads$message, 'â€"')
 ```
 ```{r document_matrix}
-descr = Corpus(VectorSource(pol_ads$message))
-xtext = DocumentTermMatrix(descr)
+#Before additional cleaning, 162324 observations
 
-xtext = sparseMatrix(i=xtext$i,j=xtext$j,x=as.numeric(xtext$v>0), dims=dim(xtext),dimnames=dimnames(xtext))
+message_text = Corpus(VectorSource(pol_ads$message))
+message_text = tm_map(message_text, content_transformer(tolower)) # make everything lowercase
+message_text = tm_map(message_text, content_transformer(removeNumbers)) # remove numbers
+message_text = tm_map(message_text, content_transformer(removePunctuation)) # remove punctuation
+message_text = tm_map(message_text, content_transformer(stripWhitespace)) # remove excess white-space
+message_text = tm_map(message_text, content_transformer(removeWords), stopwords("en"))
+message_text = tm_map(message_text, content_transformer(wordStem))
 
-findFreqTerms(xtext, 2000)
+#This function removes any urls from our observations
+RemoveURL <- function(x){
+        gsub("http[a-z]*","",x)
+}
+message_text <- tm_map(message_text, content_transformer(RemoveURL))
+
+# Turn into Document Term Matrix
+message_DTM = DocumentTermMatrix(message_text) 
+# Still have 162324 observations, almost 100% sparsity though, have to trim this down
+
+# This next step removes sparse terms below a threshold.
+message_DTM = removeSparseTerms(message_DTM, 0.99)
+# From 92383 terms to 494 terms, much more manageable in terms of storage
+
+# Setting up a matrix if I need to cbind to this instead of DTM
+message_sparse = sparseMatrix(i=message_DTM$i,j=message_DTM$j,x=as.numeric(message_DTM$v>0), dims=dim(message_DTM),dimnames=dimnames(message_DTM))
+sparse = message_sparse[, -grep("class", colnames(message_sparse))]
+
+#cleaning additional columns out of the matrix
+
+message_DTM = message_DTM[, -grep("class", colnames(message_DTM))]
+message_DTM = message_DTM[, -grep("â€”", colnames(message_DTM))]
+message_DTM = message_DTM[, -grep("gtgt", colnames(message_DTM))]
+message_DTM = message_DTM[, -grep("â€“", colnames(message_DTM))]
+message_DTM = message_DTM[, -grep("afzspanspan", colnames(message_DTM))]
+message_DTM = message_DTM[, -grep("eimg", colnames(message_DTM))]
+message_DTM = message_DTM[, -grep("href", colnames(message_DTM))]
+message_DTM = message_DTM[, -grep("datahovercard", colnames(message_DTM))]
 ```
 
+## Results
+
+### Most Common Words
+```{r wordcloud}
+m = as.matrix(message_DTM)
+v = sort(colSums(m), decreasing=TRUE)
+d = data.frame(word = names(v), freq = v)
+wordcloud(words = d$word, freq = d$freq, min.freq = 1,
+          max.words = 75, random.order = FALSE, 
+          colors = brewer.pal(8, "Dark2"), rot.per=0.2)
+```
+
+## Conclusion
+
+## Appendix
