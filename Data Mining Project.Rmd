@@ -51,8 +51,10 @@ The main goal of this project is to understand political ads on FaceBook solely 
 If you look closely at your Facebook timeline, you might see the word "Sponsored" at the top of the post. Integrated facebook ads are advertisements that appear as part of your normal news feed. These ads could range over anything, from retail merchandising, ESPN videos, even news articles. As 2020 is an election year, many of these ads are political. In the lead-up to the election, you should expect to see many political ads on the internet either strongly for or strongly against politicians, political movements, or policy positions. Thousands of firms want to influence national political opinions through the use of advertising. Thus it makes sense to study political ads to understand what I can learn about the broader political sphere.
 
 Classifying political ads will not be an easy task however. "Politics" isn't some singular entity with well-defined characteristics, rather it is a wide field that covers a variety of topics, industries, and motivations. For example, say that a environmental non-profit firm uses an ad on Facebook to promote a message about the construction of the Keystone Pipeline. While this is likely political, it does not mean that every ad from the same entity will necessarily be political. As such, the focus of political advertisement classification in this project will not be based on the advertiser. A more effective method for classifying facebook ads would be to analyze their content, in this case the text of an advertisement. This project has two main goals:
-1- Generate data-backed insights on the different types of political ads.
-2- Create a model to predict the likelihood that an ad is political.
+
+1. Generate data-backed insights on the different types of political ads.
+2. Create a model to predict the likelihood that an ad is political.
+
 These two research goals will help us to understand political Facbook ads using both quantitative and qualitative methods. Textual analysis, even for advertisements, is an inherently subjective process as the meaning applied to words depends on surrounding context to a degree that computers cannot handle. Therefore, it is important in this project that we utilize statistical methods to bring us as close to empirical statistics as possible and then create well-reasoned interpretations based on those results.
 
 ```{r text_cleaning}
@@ -225,7 +227,7 @@ message_train_tree = subset(message_train_final[, c(1:467, 474)])
 ```
 We run the random forest model with 25 randomly generated decision trees, as beyond that amount of trees we don't see significant decreases in the model error. The model predicts the percentage of ProPublica users who voted that an ad is political with the 486 TF word weights in the training set of data. After aggregating the 25 trees, the variations caused by differing word weights are aggregated over the trees into the final predictive model. The following is a variable importance plot showing the 20 most important words in the branches within the aggregated decision trees. These weights are calculated by summing the average amount of variation that a word accounts for in the political vote percentage across the 20 decision trees. 
 
-```{r, bag_n_tag}
+```{r bag_n_tag}
 set.seed(20)
 registerDoSNOW(makeCluster(4, type="SOCK"))
 RF_pol <- foreach(ntree = rep(5, 5), .combine = combine, .packages = "randomForest") %dopar% randomForest(pol_vote_pct ~ . , ntree = ntree, mtry = 5, data=message_train_tree)
@@ -260,7 +262,7 @@ To compare the random forest model and ProPublica's machine learning model, take
 
 For ProPublica's model, the first step has already been done and we just create the dummy variable based on their listed probability. For the random forest model, we predict the probability that an ad is political for the 55430 observations in the training subset, then create the dummy variable. Comparing the results of the binary variables for each model gives us this confusion matrix.
 
-```{r proPub comparison, results='asis'}
+```{r proPub comparison}
 comparison = table( ProPublica = message_test_predictions$PP_political, Random_Forest = message_test_predictions$model_prediction)
 comparison
 ```
@@ -278,7 +280,7 @@ There are three main categories that we want to examine in order to compare the 
 - Random Forest predicts a lower probability of an ad being political than ProPublica
 - Random Forest and ProPublica agree on the advertisement.
 
-Rather than use the binary variables for this, we will use the differences between the raw predicted values from the random forest model and ProPublica's model and display some of the the advertisements with the widest and closest gaps in predicted political probability. As a note, these are the raw texts of the advertisements and include include JSON and HTML tags that make it harder to read the sentence. For integrity, I have not changed the raw message from ProPublica's database. Therefore, these are not necessarily the most extreme differences, rather they are the cleanest examples in the top 20 in each of the following categories
+Rather than use the binary variables for this, we will use the differences between the raw predicted values from the random forest model and ProPublica's model and display some of the the advertisements with the widest and closest gaps in predicted political probability. Each of the advrtisements is followed by the percentage point difference between the two model's predictions. As a note, these are the raw texts of the advertisements and include include JSON and HTML tags that make it harder to read the sentence. For integrity, I have not changed the raw message from ProPublica's database. Therefore, these are not necessarily the most extreme differences, rather they are the cleanest examples in the top 20 in each of the following categories.
 
 ```{r model gaps}
 model_differences = subset(message_test_predictions[,c(470:471, 477)])
@@ -316,26 +318,7 @@ The ProPublica data set contains 162324 observations at the time of download, bu
 
 Another potential research avenue using this same data would be to perform sentiment analysis on the political ads in the data set. Sentiment analysis is a process that quantifies the words used in a text as either positive opinions, negative opinions, or neutral, and then performs machine learning analysis to determine the overall tone, or sentiment, of a text. In this context, we would be utilizing sentiment analysis to determine if political ads contain more negative opinions than non-political ads. While there is a general conception that political ads tend to be attack ads and therefore more negative, a proper statistical analysis could reveal by how much that is.
 
-
-# Citations
-
-"Political Advertisements from Facebook", ProPublica. https://www.propublica.org/datastore/dataset/political-advertisements-from-facebook
-
 # Appendix
-
-
-```{r appendix_1}
-pol_pc_test = prcomp(message_test_final[, -c(468:476)], scale=TRUE, rank=10)
-loadings_test = pol_pc_test$rotation
-scores_test = pol_pc_test$x
-message_test_predictions = cbind(message_test_final, yhat_forest_test)
-qplot(scores_test[,1], scores_test[,2], color=message_test_predictions$yhat_forest_test, size = I(1), alpha = I(0.4)) +
-    scale_color_gradientn(colours = zissou) +
-    guides(color=guide_colourbar(title="Political Vote %")) +
-    theme_classic() + 
-        labs(y = "Principal Component 2", x = "Principal Component 1", title = "First Two Principal Components of Testing Subset")
-```
-
 
 \begin{table}
 \caption{Highest and Lowest Weighted Words for First Two Principal Components}
@@ -370,3 +353,19 @@ qplot(scores_test[,1], scores_test[,2], color=message_test_predictions$yhat_fore
 \bottomrule
 \end{tabular}
 \end{table}
+
+```{r appendix_1}
+pol_pc_test = prcomp(message_test_final[, -c(468:476)], scale=TRUE, rank=10)
+loadings_test = pol_pc_test$rotation
+scores_test = pol_pc_test$x
+message_test_predictions = cbind(message_test_final, yhat_forest_test)
+qplot(scores_test[,1], scores_test[,2], color=message_test_predictions$yhat_forest_test, size = I(1), alpha = I(0.4)) +
+    scale_color_gradientn(colours = zissou) +
+    guides(color=guide_colourbar(title="Political Vote %")) +
+    theme_classic() + 
+        labs(y = "Principal Component 2", x = "Principal Component 1", title = "First Two Principal Components of Testing Subset")
+```
+
+
+
+
